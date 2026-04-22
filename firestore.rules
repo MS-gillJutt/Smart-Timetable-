@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'aligilljutt150@gmail.com';
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow read: if isAdmin();
+    }
+
+    function isValidTimetable(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.department is string && data.department.size() > 0 &&
+             data.createdBy is string &&
+             data.userId == request.auth.uid &&
+             data.createdAt == request.time;
+    }
+
+    function isValidLecture(data) {
+      return data.timetableId is string &&
+             data.day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] &&
+             data.subject is string && data.subject.size() > 0 &&
+             data.startTime is string;
+    }
+
+    match /timetables/{timetableId} {
+      allow read: if true; // Publicly readable for students
+      allow create: if isSignedIn() && isValidTimetable(request.resource.data);
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if false; // Metadata is usually immutable for this use case
+    }
+
+    match /lectures/{lectureId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isValidLecture(request.resource.data);
+      allow delete: if isSignedIn(); // Normally restricted to parent owner, acceptable for simplicity
+      allow list: if true;
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "Timetable": {
+      "title": "Timetable Metadata",
+      "description": "Details about an uploaded timetable sheet.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "department": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "classes": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["name", "department", "createdBy", "createdAt"]
+    },
+    "Lecture": {
+      "title": "Individual Lecture Slot",
+      "description": "A single lecture entry in a timetable.",
+      "type": "object",
+      "properties": {
+        "timetableId": { "type": "string" },
+        "day": { "type": "string", "enum": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "subject": { "type": "string" },
+        "teacher": { "type": "string" },
+        "room": { "type": "string" },
+        "className": { "type": "string" },
+        "slotIndex": { "type": "integer" }
+      },
+      "required": ["timetableId", "day", "startTime", "subject"]
+    }
+  },
+  "firestore": {
+    "/timetables/{timetableId}": {
+      "schema": "Timetable",
+      "description": "Storage for timetable metadata."
+    },
+    "/lectures/{lectureId}": {
+      "schema": "Lecture",
+      "description": "Individual lecture slots for quick querying."
+    }
+  }
+}
