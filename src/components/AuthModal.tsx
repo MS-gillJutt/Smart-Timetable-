@@ -108,32 +108,32 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         <form onSubmit={handleEmailAuth} className="space-y-4">
           {!isLogin && (
             <div className="relative group">
-              <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-teal-600 transition-colors" />
+              <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
               <input 
                 type="text"
                 placeholder="Full Name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="w-full h-12 bg-white border border-slate-300 pl-12 pr-4 font-sans font-medium text-slate-900 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 rounded-lg transition-shadow"
+                className="w-full h-12 bg-white border border-slate-300 pl-12 pr-4 font-sans font-medium text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg transition-shadow"
               />
             </div>
           )}
 
           <div className="relative group">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-teal-600 transition-colors" />
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
             <input 
               type="email"
               placeholder="University Email Address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full h-12 bg-white border border-slate-300 pl-12 pr-4 font-sans font-medium text-slate-900 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 rounded-lg transition-shadow"
+              className="w-full h-12 bg-white border border-slate-300 pl-12 pr-4 font-sans font-medium text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg transition-shadow"
             />
           </div>
 
           <div className="relative group">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-teal-600 transition-colors" />
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
             <input 
               type="password"
               placeholder="Password (Min 6 chars)"
@@ -141,7 +141,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full h-12 bg-white border border-slate-300 pl-12 pr-4 font-sans font-medium text-slate-900 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 rounded-lg transition-shadow"
+              className="w-full h-12 bg-white border border-slate-300 pl-12 pr-4 font-sans font-medium text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg transition-shadow"
             />
           </div>
 
@@ -178,7 +178,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           {isLogin ? "Don't have an account? " : "Already have an account? "}
           <button 
             onClick={() => setIsLogin(!isLogin)}
-            className="font-bold text-teal-600 hover:text-teal-700 hover:underline transition-colors"
+            className="font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
           >
             {isLogin ? 'Sign up' : 'Sign in'}
           </button>

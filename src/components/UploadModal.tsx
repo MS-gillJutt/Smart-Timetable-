@@ -3,8 +3,7 @@ import { useDropzone, FileRejection, DropEvent } from 'react-dropzone';
 import { Upload, Loader2, X, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { parseTimetable } from '../lib/gemini';
-import { db, auth } from '../lib/firebase';
-import { collection, addDoc, serverTimestamp, writeBatch, doc, query, where, getDocs } from 'firebase/firestore';
+import { localDb } from '../lib/storage';
 import { cn } from '../lib/utils';
 
 interface UploadModalProps {
@@ -32,22 +31,7 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
     setError(null);
     setSuccess(false);
 
-    if (!auth.currentUser) {
-      setError('You must be signed in to upload a timetable.');
-      setIsProcessing(false);
-      return;
-    }
-
     try {
-      // Check if user already has a timetable
-      const existingQ = query(collection(db, 'timetables'), where('userId', '==', auth.currentUser.uid));
-      const existingSnap = await getDocs(existingQ);
-      if (!existingSnap.empty) {
-        setError('You can only have ONE timetable at a time. Please delete your existing timetable before uploading a new one.');
-        setIsProcessing(false);
-        return;
-      }
-
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve) => {
         reader.onload = () => {
@@ -60,26 +44,26 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
 
       const data = await parseTimetable(base64, file.type);
       
-      // Save to Firebase
-      const timetableRef = await addDoc(collection(db, 'timetables'), {
+      const timetableId = 'local_' + Date.now() + Math.random().toString(36).substring(2, 9);
+      
+      // Save directly to localStorage
+      localDb.saveTimetable({
+        id: timetableId,
         name: data.name,
         department: data.department,
         createdBy: data.createdBy,
-        userId: auth.currentUser.uid,
         classes: data.classes,
-        createdAt: serverTimestamp(),
+        createdAt: Date.now()
       });
 
-      const batch = writeBatch(db);
-      data.lectures.forEach((lecture) => {
-        const lectureRef = doc(collection(db, 'lectures'));
-        batch.set(lectureRef, {
-          ...lecture,
-          timetableId: timetableRef.id,
-        });
-      });
+      const processedLectures = data.lectures.map(lecture => ({
+        ...lecture,
+        id: 'lec_' + Date.now() + Math.random().toString(36).substring(2, 9),
+        timetableId: timetableId,
+      }));
 
-      await batch.commit();
+      localDb.saveLectures(processedLectures);
+
       setSuccess(true);
       setTimeout(() => {
         onSuccess();
@@ -88,7 +72,11 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
       }, 1500);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Failed to process timetable. Please try again.');
+      if (err.message === "NOT_TIMETABLE") {
+        setError("The uploaded file does not appear to be a timetable. Please upload a valid timetable image or document.");
+      } else {
+        setError(err.message || 'Failed to process timetable. Please try again.');
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -98,8 +86,11 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
     onDrop,
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png'],
-      'application/pdf': ['.pdf']
+      'application/pdf': ['.pdf'],
+      'application/vnd.ms-powerpoint': ['.ppt'],
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx']
     },
+    maxSize: 10 * 1024 * 1024, // 10MB limit
     multiple: false
   } as any);
 
@@ -125,14 +116,14 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
           Upload an image or PDF. Our AI will automatically extract classes, subjects, and rooms.
         </p>
 
-        <div 
-          {...getRootProps()} 
-          className={cn(
-            "relative group cursor-pointer border-2 border-dashed aspect-video flex flex-col items-center justify-center transition-all rounded-xl",
-            isDragActive ? "border-teal-500 bg-teal-50" : "border-slate-300 hover:border-teal-400",
-            isProcessing && "pointer-events-none opacity-50"
-          )}
-        >
+          <div 
+            {...getRootProps()} 
+            className={cn(
+              "relative group cursor-pointer border-2 border-dashed aspect-video flex flex-col items-center justify-center transition-all rounded-xl",
+              isDragActive ? "border-blue-500 bg-amber-50" : "border-slate-300 hover:border-blue-400",
+              isProcessing && "pointer-events-none opacity-50"
+            )}
+          >
           <input {...getInputProps()} />
           
           
@@ -150,10 +141,10 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
               <motion.div 
                 key="success"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                className="flex flex-col items-center text-teal-600"
+                className="flex flex-col items-center text-blue-600"
               >
                 <CheckCircle2 className="w-12 h-12 mb-4" />
-                <p className="font-mono font-bold text-xs uppercase tracking-widest text-teal-700">Successfully Stored!</p>
+                <p className="font-mono font-bold text-xs uppercase tracking-widest text-blue-700">Successfully Stored!</p>
               </motion.div>
             ) : (
               <motion.div 
@@ -161,9 +152,9 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="flex flex-col items-center text-center px-4"
               >
-                <Upload className="w-12 h-12 mb-4 opacity-50 text-slate-400 group-hover:text-teal-600 group-hover:opacity-100 transition-colors" />
-                <p className="font-sans font-bold text-slate-900 mb-1">Click or drop image</p>
-                <p className="text-xs font-medium text-slate-500">PNG, JPG or PDF up to 10MB</p>
+                <Upload className="w-12 h-12 mb-4 opacity-50 text-slate-400 group-hover:text-blue-600 group-hover:opacity-100 transition-colors" />
+                <p className="font-sans font-bold text-slate-900 mb-1">Click or drop file</p>
+                <p className="text-xs font-medium text-slate-500">PNG, JPG, PDF or PPT up to 10MB</p>
               </motion.div>
             )}
           </AnimatePresence>

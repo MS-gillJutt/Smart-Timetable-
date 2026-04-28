@@ -11,7 +11,10 @@ export async function parseTimetable(base64Data: string, mimeType: string): Prom
   lectures: Omit<Lecture, 'id' | 'timetableId'>[];
 }> {
   const prompt = `
-    Analyze this university timetable image or PDF.
+    Analyze this document/image.
+    First, determine if the document actually represents a university or school timetable / schedule. 
+    If the document does not look like a timetable (e.g., it is a book, a random picture, or unrelated text), set "isTimetable" to false.
+    If it is a timetable:
     Extract the following information in JSON format:
     1. Timetable meta-info: name (e.g. "BSCS 6 M" or "Timetable 2026"), department, createdBy (e.g. who signed it).
     2. A flat list of every lecture slot found.
@@ -21,6 +24,7 @@ export async function parseTimetable(base64Data: string, mimeType: string): Prom
     - Extract ALL lectures from the image.
     - Structure the response exactly as follows:
     {
+      "isTimetable": true,
       "name": "Class Name",
       "department": "Department Name",
       "createdBy": "Person Name",
@@ -60,6 +64,7 @@ export async function parseTimetable(base64Data: string, mimeType: string): Prom
       responseSchema: {
         type: Type.OBJECT,
         properties: {
+          isTimetable: { type: Type.BOOLEAN },
           name: { type: Type.STRING },
           department: { type: Type.STRING },
           createdBy: { type: Type.STRING },
@@ -91,6 +96,10 @@ export async function parseTimetable(base64Data: string, mimeType: string): Prom
       cleanText = cleanText.replace(/^```json/, "").replace(/```$/, "");
     }
     const parsed = JSON.parse(cleanText);
+
+    if (parsed.isTimetable === false) {
+      throw new Error("NOT_TIMETABLE");
+    }
 
     // Sanitize to match Firestore rules
     const sanitizedClasses = Array.isArray(parsed.classes) && parsed.classes.length > 0 

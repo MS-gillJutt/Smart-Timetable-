@@ -4,64 +4,16 @@
  */
 
 import { useState, useEffect } from 'react';
-import { LogIn, CalendarDays, Download, ShieldCheck, MailQuestion, ArrowLeft } from 'lucide-react';
-import { auth, db } from './lib/firebase';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { collection, getDocs } from 'firebase/firestore';
+import { CalendarDays, ShieldCheck, MailQuestion, ArrowLeft, Upload as UploadIcon, Info } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Dashboard from './components/Dashboard';
 import UploadModal from './components/UploadModal';
-import AuthModal from './components/AuthModal';
 
 type Page = 'dashboard' | 'privacy' | 'support';
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setHasCheckedAuth(true);
-      // Auto-open auth modal if they are not logged in and we just finished checking
-      if (!u && !hasCheckedAuth) {
-        setIsAuthOpen(true);
-      }
-    });
-    return unsubscribe;
-  }, [hasCheckedAuth]);
-
-  const handleSignOut = () => signOut(auth);
-
-  const isAdmin = user?.email === 'aligilljutt150@gmail.com';
-
-  const exportUsersToCSV = async () => {
-    if (!isAdmin) return;
-    try {
-      const usersSnap = await getDocs(collection(db, 'users'));
-      let csvContent = "data:text/csv;charset=utf-8,";
-      csvContent += "UID,Name,Email\n"; // Header
-
-      usersSnap.forEach(doc => {
-        const data = doc.data();
-        csvContent += `${doc.id},"${data.name || ''}","${data.email || ''}"\n`;
-      });
-
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", "unitime_users.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err) {
-      console.error("Failed to export users", err);
-      alert("Failed to export users. Check permissions.");
-    }
-  };
 
   const PageTransition = ({ children }: { children: React.ReactNode }) => (
     <motion.div
@@ -80,53 +32,23 @@ export default function App() {
       <nav className="border-b border-slate-200 bg-white sticky top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
           <button onClick={() => setCurrentPage('dashboard')} className="flex items-center gap-3 text-left group">
-            <div className="bg-teal-600 p-2 rounded-lg shadow-sm group-hover:bg-teal-700 transition-colors">
+            <div className="bg-blue-600 p-2 rounded-lg shadow-sm group-hover:bg-blue-700 transition-colors">
               <CalendarDays className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1 className="text-2xl font-display font-bold tracking-tight leading-none text-slate-900">Smart Time Table</h1>
-              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-teal-600">Assistant</span>
+              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-blue-600">Assistant</span>
             </div>
           </button>
 
           <div className="flex items-center gap-6">
-            {user ? (
-              <div className="flex items-center gap-4">
-                {isAdmin && (
-                  <button 
-                    onClick={exportUsersToCSV}
-                    className="hidden sm:flex items-center gap-2 font-mono font-bold text-[10px] uppercase text-slate-500 hover:text-teal-600 border-r border-slate-200 pr-4 mr-1 transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                    Export Users
-                  </button>
-                )}
-                <div className="hidden sm:flex flex-col items-end">
-                  <span className="text-sm font-bold text-slate-900">{user.displayName || user.email?.split('@')[0]}</span>
-                  <button 
-                    onClick={handleSignOut}
-                    className="text-[10px] font-mono font-bold uppercase text-slate-400 hover:text-red-500 transition-colors"
-                  >
-                    Logout
-                  </button>
-                </div>
-                {user.photoURL ? (
-                  <img src={user.photoURL} alt="" className="w-10 h-10 ring-2 ring-teal-100 rounded-full shadow-sm" />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-teal-50 shadow-sm flex items-center justify-center font-bold font-display text-lg text-teal-700 border border-teal-100">
-                    {user.email?.charAt(0).toUpperCase()}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <button 
-                onClick={() => setIsAuthOpen(true)}
-                className="flex items-center gap-2 font-mono font-bold text-xs uppercase tracking-widest text-teal-600 hover:text-teal-700 hover:underline"
-              >
-                <LogIn className="w-4 h-4" />
-                Sign In to Manage
-              </button>
-            )}
+            <button 
+              onClick={() => setIsUploadOpen(true)}
+              className="flex items-center gap-2 font-mono font-bold text-xs uppercase tracking-widest text-blue-600 hover:text-blue-700 hover:underline"
+            >
+              <UploadIcon className="w-4 h-4" />
+              Upload Timetable
+            </button>
           </div>
         </div>
       </nav>
@@ -136,38 +58,41 @@ export default function App() {
         <AnimatePresence mode="wait">
           {currentPage === 'dashboard' && (
             <PageTransition key="dashboard">
-              <Dashboard onAddClick={() => {
-                if (!user) setIsAuthOpen(true);
-                else setIsUploadOpen(true);
-              }} />
+              <div className="max-w-7xl mx-auto px-4 mt-8">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-4">
+                  <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-bold text-blue-900">100% Private & Local Storage</h3>
+                    <p className="text-sm text-blue-800">Your timetable data is stored entirely on your device (in localStorage) to conserve server space and guarantee privacy. No login required.</p>
+                  </div>
+                </div>
+              </div>
+              <Dashboard onAddClick={() => setIsUploadOpen(true)} />
             </PageTransition>
           )}
 
           {currentPage === 'privacy' && (
             <PageTransition key="privacy">
               <div className="max-w-4xl mx-auto px-4 py-16">
-                <button onClick={() => setCurrentPage('dashboard')} className="flex items-center text-teal-600 font-bold mb-8 hover:underline">
+                <button onClick={() => setCurrentPage('dashboard')} className="flex items-center text-blue-600 font-bold mb-8 hover:underline">
                   <ArrowLeft className="w-4 h-4 mr-2" /> Back to Dashboard
                 </button>
                 <div className="bg-white p-8 md:p-12 rounded-2xl shadow-sm border border-slate-200">
                   <div className="flex items-center mb-6">
-                    <ShieldCheck className="w-8 h-8 text-teal-600 mr-4" />
+                    <ShieldCheck className="w-8 h-8 text-blue-600 mr-4" />
                     <h2 className="text-3xl font-display font-bold text-slate-900">Privacy Policy</h2>
                   </div>
                   <div className="prose prose-slate max-w-none space-y-6">
                     <p className="font-medium text-slate-600 text-lg">Your privacy is important to us. This policy outlines how we handle your data.</p>
                     
-                    <h3 className="text-xl font-bold text-slate-800">1. Data We Collect</h3>
-                    <p className="text-slate-600">We collect your email, name, and uploaded timetables to provide this service. We do not sell this data to third parties.</p>
+                    <h3 className="text-xl font-bold text-slate-800">1. Local Storage</h3>
+                    <p className="text-slate-600">Your timetables are saved directly to your browser's local storage. This means your data never enters a centralized database, saving server space and keeping it private.</p>
 
-                    <h3 className="text-xl font-bold text-slate-800">2. How We Use It</h3>
-                    <p className="text-slate-600">Timetable images are processed by Google's Gemini AI to extract schedules. Your data is strictly used to display your timetable natively.</p>
+                    <h3 className="text-xl font-bold text-slate-800">2. Processing Images</h3>
+                    <p className="text-slate-600">When you upload an image, it is sent to Google's Gemini AI strictly for the purpose of extracting the schedule data. The image is not retained.</p>
 
-                    <h3 className="text-xl font-bold text-slate-800">3. Authentication</h3>
-                    <p className="text-slate-600">We use Firebase Authentication (Google). This ensures your passwords and login state are handled securely using industry-standard cryptography.</p>
-
-                    <h3 className="text-xl font-bold text-slate-800">4. Your Rights</h3>
-                    <p className="text-slate-600">You retain full ownership of the data you upload. You may delete any timetables you have uploaded at any time using the dashboard tools.</p>
+                    <h3 className="text-xl font-bold text-slate-800">3. Your Rights</h3>
+                    <p className="text-slate-600">You retain full ownership of your data. You can delete timetables from the dashboard at any time, which permanently removes them from your device.</p>
                   </div>
                 </div>
               </div>
@@ -177,11 +102,11 @@ export default function App() {
           {currentPage === 'support' && (
             <PageTransition key="support">
               <div className="max-w-3xl mx-auto px-4 py-16">
-                <button onClick={() => setCurrentPage('dashboard')} className="flex items-center text-teal-600 font-bold mb-8 hover:underline">
+                <button onClick={() => setCurrentPage('dashboard')} className="flex items-center text-blue-600 font-bold mb-8 hover:underline">
                   <ArrowLeft className="w-4 h-4 mr-2" /> Back to Dashboard
                 </button>
                 <div className="bg-white p-8 md:p-12 rounded-2xl shadow-sm border border-slate-200 text-center">
-                  <MailQuestion className="w-16 h-16 text-teal-600 mx-auto mb-6" />
+                  <MailQuestion className="w-16 h-16 text-blue-600 mx-auto mb-6" />
                   <h2 className="text-3xl font-display font-bold text-slate-900 mb-4">Support & Help</h2>
                   <p className="text-slate-600 text-lg mb-8 max-w-md mx-auto">
                     If you encounter any issues with AI scanning, logging in, or visualizing your timetables, we are here to help.
@@ -200,7 +125,7 @@ export default function App() {
 
                   <div className="mt-12 pt-8 border-t border-slate-100">
                     <p className="text-slate-500 font-medium">For direct assistance, email the administrator:</p>
-                    <a href="mailto:aligilljutt150@gmail.com" className="inline-block mt-2 font-display font-bold text-teal-600 text-xl hover:text-teal-700 transition-colors">
+                    <a href="mailto:aligilljutt150@gmail.com" className="inline-block mt-2 font-display font-bold text-blue-600 text-xl hover:text-blue-700 transition-colors">
                       aligilljutt150@gmail.com
                     </a>
                   </div>
@@ -219,8 +144,8 @@ export default function App() {
             <p className="text-[11px] font-mono font-bold uppercase text-slate-400 mt-1">Smart Time Table - Assistant</p>
           </div>
           <div className="flex gap-8">
-            <button onClick={() => setCurrentPage('support')} className="font-mono font-bold text-[10px] uppercase text-slate-500 tracking-widest hover:text-teal-600 hover:underline transition-colors">Support</button>
-            <button onClick={() => setCurrentPage('privacy')} className="font-mono font-bold text-[10px] uppercase text-slate-500 tracking-widest hover:text-teal-600 hover:underline transition-colors">Privacy</button>
+            <button onClick={() => setCurrentPage('support')} className="font-mono font-bold text-[10px] uppercase text-slate-500 tracking-widest hover:text-blue-600 hover:underline transition-colors">Support</button>
+            <button onClick={() => setCurrentPage('privacy')} className="font-mono font-bold text-[10px] uppercase text-slate-500 tracking-widest hover:text-blue-600 hover:underline transition-colors">Privacy</button>
           </div>
         </div>
       </footer>
@@ -232,14 +157,8 @@ export default function App() {
             isOpen={isUploadOpen} 
             onClose={() => setIsUploadOpen(false)}
             onSuccess={() => {
-              // Dashboard handles refresh automatically via onSnapshot
+              window.dispatchEvent(new Event('storage'));
             }}
-          />
-        )}
-        {isAuthOpen && (
-          <AuthModal 
-            isOpen={isAuthOpen} 
-            onClose={() => setIsAuthOpen(false)}
           />
         )}
       </AnimatePresence>
