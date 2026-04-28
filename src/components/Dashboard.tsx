@@ -86,6 +86,17 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
     }
   };
 
+  const handleTimetableChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newId = e.target.value;
+    setSelectedTimetableId(newId);
+    const tbl = timetables.find(t => t.id === newId);
+    if (tbl && tbl.classes.length > 0) {
+      setSelectedClassName(tbl.classes[0]);
+    } else {
+      setSelectedClassName('');
+    }
+  };
+
   const filteredTimetables = timetables.filter(t => {
     const matchesSearch = t.department.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           t.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -126,18 +137,18 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
         <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-end">
           <div className="flex-1 w-full space-y-2">
             <div className="flex items-center justify-between">
-              <label className="font-mono text-[10px] uppercase tracking-widest text-black/40">Select Timetable Source</label>
+              <label className="font-mono font-bold text-[10px] uppercase tracking-widest text-slate-500">Select Timetable Source</label>
               {auth.currentUser && (
                 <div className="flex gap-2">
                   <button 
                     onClick={() => setFilterMode('all')}
-                    className={cn("font-mono text-[9px] uppercase tracking-widest px-2 py-1 transition-colors", filterMode === 'all' ? "bg-black text-white" : "text-black/40 hover:text-black")}
+                    className={cn("font-mono font-bold text-[9px] uppercase tracking-widest px-2 py-1 transition-colors rounded", filterMode === 'all' ? "bg-teal-600 text-white" : "text-slate-500 hover:text-teal-600 hover:bg-teal-50")}
                   >
                     All
                   </button>
                   <button 
                     onClick={() => setFilterMode('mine')}
-                    className={cn("font-mono text-[9px] uppercase tracking-widest px-2 py-1 transition-colors", filterMode === 'mine' ? "bg-black text-white" : "text-black/40 hover:text-black")}
+                    className={cn("font-mono font-bold text-[9px] uppercase tracking-widest px-2 py-1 transition-colors rounded", filterMode === 'mine' ? "bg-teal-600 text-white" : "text-slate-500 hover:text-teal-600 hover:bg-teal-50")}
                   >
                     Mine
                   </button>
@@ -147,8 +158,8 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
             <div className="relative">
               <select 
                 value={selectedTimetableId}
-                onChange={(e) => setSelectedTimetableId(e.target.value)}
-                className="w-full h-12 bg-white border border-[#141414] px-4 font-sans focus:outline-none appearance-none cursor-pointer"
+                onChange={handleTimetableChange}
+                className="w-full h-12 bg-white border border-slate-300 px-4 font-sans font-bold text-slate-900 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer rounded-lg shadow-sm transition-all"
               >
                 <option value="">Select a timetable...</option>
                 {filteredTimetables.map(t => (
@@ -160,12 +171,12 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
           </div>
 
         <div className="flex-1 w-full space-y-2">
-          <label className="font-mono text-[10px] uppercase tracking-widest text-black/40">Class / Section</label>
+          <label className="font-mono font-bold text-[10px] uppercase tracking-widest text-slate-500">Class / Section</label>
           <div className="relative">
             <select 
               value={selectedClassName}
               onChange={(e) => setSelectedClassName(e.target.value)}
-              className="w-full h-12 bg-white border border-[#141414] px-4 font-sans focus:outline-none appearance-none cursor-pointer"
+              className="w-full h-12 bg-white border border-slate-300 px-4 font-sans font-bold text-slate-900 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer rounded-lg shadow-sm transition-all"
             >
               <option value="">Select a class...</option>
               {selectedTimetable?.classes.map(c => (
@@ -179,7 +190,7 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
         <div className="flex gap-2">
           <button 
             onClick={onAddClick}
-            className="h-12 px-6 bg-[#141414] text-[#FAF9F6] font-mono text-xs uppercase tracking-widest hover:bg-black/90 transition-colors"
+            className="h-12 px-6 bg-teal-600 text-white font-mono font-bold text-xs uppercase tracking-widest hover:bg-teal-700 transition-colors rounded-lg shadow-sm"
           >
             Update / Add
           </button>
@@ -187,7 +198,7 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
             <button 
               disabled={isDeleting}
               onClick={handleDelete}
-              className="h-12 w-12 flex items-center justify-center border border-red-200 text-red-500 hover:bg-red-50 transition-colors"
+              className="h-12 w-12 flex items-center justify-center border border-red-200 text-red-500 hover:bg-red-50 transition-colors rounded-lg"
             >
               <Trash2 className="w-5 h-5" />
             </button>
@@ -197,46 +208,54 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
     </div>
 
     {!selectedTimetableId ? (
-        <div className="text-center py-24 border-2 border-dashed border-black/10 rounded-3xl">
-          <LayoutGrid className="w-12 h-12 mx-auto mb-4 opacity-10" />
-          <h3 className="text-xl font-serif">No Timetable Selected</h3>
-          <p className="text-sm text-black/40">Upload a schedule to get started</p>
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          className="text-center py-24 border-2 border-dashed border-slate-200 rounded-3xl bg-white/50"
+        >
+          <LayoutGrid className="w-12 h-12 mx-auto mb-4 opacity-20 text-slate-900" />
+          <h3 className="text-xl font-display font-bold text-slate-800">No Timetable Selected</h3>
+          <p className="text-sm font-medium text-slate-500">Upload a schedule to get started</p>
+        </motion.div>
       ) : (
         <div className="space-y-12">
           {/* Metadata Bar */}
-          <div className="flex flex-wrap gap-x-8 gap-y-4 p-6 bg-white border border-[#141414] shadow-[4px_4px_0px_0px_rgba(20,20,20,1)]">
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+            className="flex flex-wrap gap-x-8 gap-y-4 p-6 bg-white border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] rounded-2xl"
+          >
             <div className="space-y-1">
-              <span className="font-mono text-[9px] uppercase text-black/40">Uploaded By</span>
-              <p className="font-sans text-sm font-medium">{selectedTimetable?.createdBy || 'Official'}</p>
+              <span className="font-mono font-bold text-[9px] uppercase text-slate-400">Uploaded By</span>
+              <p className="font-sans text-sm font-bold text-slate-900">{selectedTimetable?.createdBy || 'Official'}</p>
             </div>
             <div className="space-y-1">
-              <span className="font-mono text-[9px] uppercase text-black/40">Generated On</span>
-              <p className="font-sans text-sm font-medium">
+              <span className="font-mono font-bold text-[9px] uppercase text-slate-400">Generated On</span>
+              <p className="font-sans text-sm font-bold text-slate-900">
                 {selectedTimetable?.createdAt?.toDate ? selectedTimetable.createdAt.toDate().toLocaleDateString() : 'Recently'}
               </p>
             </div>
             <div className="space-y-1">
-              <span className="font-mono text-[9px] uppercase text-black/40">Today</span>
-              <p className="font-sans text-sm font-bold text-blue-600">{currentDay}</p>
+              <span className="font-mono font-bold text-[9px] uppercase text-slate-400">Today</span>
+              <p className="font-sans text-sm font-bold text-teal-600">{currentDay}</p>
             </div>
-          </div>
+          </motion.div>
 
           {/* Toggle View */}
           <div className="flex justify-between items-center">
-            <h2 className="text-3xl font-serif italic">Your Schedule</h2>
-            <div className="flex border border-black bg-white">
+            <h2 className="text-3xl font-display font-bold text-slate-900">Your Schedule</h2>
+            <div className="flex bg-slate-100 p-1 rounded-lg">
               <button 
                 onClick={() => setViewMode('daily')}
-                className={cn("p-2 transition-colors", viewMode === 'daily' ? "bg-black text-white" : "hover:bg-black/5")}
+                className={cn("px-3 py-2 transition-all font-bold rounded-md flex items-center gap-2", viewMode === 'daily' ? "bg-white text-teal-700 shadow-sm" : "text-slate-500 hover:text-slate-900")}
               >
                 <List className="w-4 h-4" />
+                <span className="text-xs hidden sm:block">Daily</span>
               </button>
               <button 
                 onClick={() => setViewMode('grid')}
-                className={cn("p-2 transition-colors", viewMode === 'grid' ? "bg-black text-white" : "hover:bg-black/5")}
+                className={cn("px-3 py-2 transition-all font-bold rounded-md flex items-center gap-2", viewMode === 'grid' ? "bg-white text-teal-700 shadow-sm" : "text-slate-500 hover:text-slate-900")}
               >
                 <LayoutGrid className="w-4 h-4" />
+                <span className="text-xs hidden sm:block">Grid</span>
               </button>
             </div>
           </div>
@@ -245,42 +264,54 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
             {viewMode === 'daily' ? (
               <motion.div 
                 key="daily"
-                initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }}
+                initial="hidden" animate="show" exit={{ opacity: 0, x: -20 }}
+                variants={{
+                  hidden: { opacity: 0 },
+                  show: {
+                    opacity: 1,
+                    transition: { staggerChildren: 0.1 }
+                  }
+                }}
                 className="space-y-4"
               >
-                <h3 className="font-mono text-xs uppercase tracking-widest mb-6">Today's Lectures ({currentDay})</h3>
+                <h3 className="font-mono font-bold text-xs uppercase tracking-widest mb-6 text-slate-500">Today's Lectures ({currentDay})</h3>
                 {todayLectures.length === 0 ? (
-                  <p className="py-12 text-center text-black/40 italic font-serif">No lectures scheduled for today. Enjoy your break!</p>
+                  <p className="py-12 text-center text-slate-400 font-medium font-sans">No lectures scheduled for today. Enjoy your break!</p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {todayLectures.map((lecture, i) => (
                       <motion.div 
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.1 }}
+                        variants={{
+                          hidden: { opacity: 0, y: 20 },
+                          show: { opacity: 1, y: 0 }
+                        }}
                         key={lecture.id}
-                        className="bg-white border border-[#141414] p-6 group hover:translate-x-1 hover:-translate-y-1 transition-transform"
+                        className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm hover:shadow-md hover:border-teal-200 group hover:-translate-y-1 transition-all"
                       >
                          <div className="flex justify-between items-start mb-6">
-                            <div className="bg-[#141414] text-[#FAF9F6] px-3 py-1 font-mono text-[10px]">
+                            <div className="bg-teal-50 text-teal-700 px-3 py-1 font-mono font-bold rounded-md text-[10px] border border-teal-100">
                               SLOT {lecture.slotIndex}
                             </div>
-                            <div className="flex items-center gap-2 text-black/40">
+                            <div className="flex items-center gap-2 text-slate-400 font-medium">
                               <Clock className="w-4 h-4" />
-                              <span className="font-mono text-[10px]">{lecture.startTime} - {lecture.endTime}</span>
+                              <span className="font-mono font-bold text-[10px]">{lecture.startTime} - {lecture.endTime}</span>
                             </div>
                          </div>
-                         <h4 className="text-xl font-sans font-bold leading-tight mb-4 group-hover:text-blue-600 transition-colors">
+                         <h4 className="text-xl font-display font-bold leading-tight mb-4 text-slate-900 group-hover:text-teal-600 transition-colors">
                            {lecture.subject}
                          </h4>
-                         <div className="space-y-2 pt-4 border-t border-black/5">
-                            <div className="flex items-center gap-3 text-sm">
-                              <User className="w-4 h-4 text-black/40" />
+                         <div className="space-y-3 pt-4 border-t border-slate-100">
+                            <div className="flex items-center gap-3 text-sm text-slate-600 font-medium">
+                              <div className="p-1.5 rounded-full bg-slate-50 text-slate-400">
+                                <User className="w-3.5 h-3.5" />
+                              </div>
                               <span>{lecture.teacher}</span>
                             </div>
-                            <div className="flex items-center gap-3 text-sm">
-                              <MapPin className="w-4 h-4 text-black/40" />
-                              <span className="font-medium">{lecture.room}</span>
+                            <div className="flex items-center gap-3 text-sm text-slate-800 font-bold">
+                              <div className="p-1.5 rounded-full bg-slate-50 text-slate-400">
+                                <MapPin className="w-3.5 h-3.5" />
+                              </div>
+                              <span>{lecture.room}</span>
                             </div>
                          </div>
                       </motion.div>
@@ -291,35 +322,35 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
             ) : (
               <motion.div 
                 key="grid"
-                initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}
-                className="overflow-x-auto border border-[#141414]"
+                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+                className="overflow-x-auto border border-slate-200 rounded-2xl shadow-sm"
               >
                 <table className="w-full text-left border-collapse bg-white">
                   <thead>
-                    <tr className="bg-[#141414] text-[#FAF9F6]">
-                      <th className="p-4 font-mono text-[10px] uppercase border border-[#141414]">Day / Slot</th>
+                    <tr className="bg-slate-50 text-slate-600">
+                      <th className="p-4 font-mono font-bold text-[10px] uppercase border-b border-r border-slate-200">Day / Slot</th>
                       {[...Array(12)].map((_, i) => (
-                        <th key={i} className="p-4 font-mono text-[10px] uppercase border border-[#141414] text-center">{i + 1}</th>
+                        <th key={i} className="p-4 font-mono font-bold text-[10px] uppercase border-b border-r border-slate-200 text-center">{i + 1}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {DAYS.map(day => (
-                      <tr key={day} className={cn(day === currentDay && "bg-blue-50/50")}>
-                        <td className="p-4 font-sans font-bold text-sm border border-[#141414] bg-[#F5F5F5]">{day.slice(0,3)}</td>
+                      <tr key={day} className={cn("transition-colors", day === currentDay ? "bg-teal-50/50" : "hover:bg-slate-50/50")}>
+                        <td className="p-4 font-sans font-bold text-sm border-r border-b border-slate-200 bg-slate-50 text-slate-900">{day.slice(0,3)}</td>
                         {[...Array(12)].map((_, i) => {
                           const lect = filteredLectures.find(l => l.day === day && (l.slotIndex === i + 1));
                           return (
-                            <td key={i} className="p-2 border border-black/10 min-w-[140px] align-top">
+                            <td key={i} className="p-2 border-r border-b border-slate-100 min-w-[140px] align-top bg-white">
                               {lect ? (
-                                <div className="text-[10px] leading-tight flex flex-col h-full justify-between">
-                                  <div className="font-bold mb-1 line-clamp-2">{lect.subject}</div>
-                                  <div className="text-black/60 italic">{lect.teacher}</div>
-                                  <div className="mt-2 font-mono text-[9px] bg-black/5 p-1 rounded inline-block w-fit">{lect.room}</div>
+                                <div className="text-[10px] leading-tight flex flex-col h-full justify-between p-1.5 rounded bg-white">
+                                  <div className="font-bold mb-1 line-clamp-2 text-slate-900">{lect.subject}</div>
+                                  <div className="text-slate-500 font-medium">{lect.teacher}</div>
+                                  <div className="mt-2 font-mono font-bold text-[9px] text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded inline-block w-fit">{lect.room}</div>
                                 </div>
                               ) : (
                                 <div className="h-full min-h-[60px] opacity-10 flex items-center justify-center">
-                                  <div className="w-2 h-2 rounded-full bg-black" />
+                                  <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
                                 </div>
                               )}
                             </td>

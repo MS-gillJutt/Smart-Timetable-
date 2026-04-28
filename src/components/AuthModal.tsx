@@ -57,11 +57,11 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/email-already-in-use') {
-        setError('Email already in use. Please sign in instead.');
+        setError('This email address is already registered. Please sign in instead.');
       } else if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        setError('Invalid email or password.');
+        setError('We couldn\'t find an account matching these details. Please check your email and password, and try again.');
       } else {
-        setError('An error occurred during authentication. Note: Email/Password must be enabled in Firebase Console.');
+        setError('We encountered a problem signing you in securely. Please ensure Email/Password login is enabled or try again later.');
       }
     } finally {
       setIsLoading(false);
@@ -89,51 +89,51 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="relative w-full max-w-md bg-[#FAF9F6] border border-[#141414] shadow-[8px_8px_0px_0px_rgba(20,20,20,1)] p-8"
+        className="relative w-full max-w-md bg-white border border-slate-200 shadow-xl p-8 rounded-2xl"
       >
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 p-1 transition-colors hover:bg-black/5"
+          className="absolute top-4 right-4 p-1 transition-colors text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <h2 className="text-3xl font-serif italic mb-2">
+        <h2 className="text-3xl font-display mb-2 font-bold text-slate-900">
           {isLogin ? 'Welcome Back' : 'Create Account'}
         </h2>
-        <p className="text-sm text-black/60 mb-8">
+        <p className="text-sm font-medium text-slate-500 mb-8">
           {isLogin ? 'Sign in to manage your timetables.' : 'Join to upload and share your timetables.'}
         </p>
 
         <form onSubmit={handleEmailAuth} className="space-y-4">
           {!isLogin && (
             <div className="relative group">
-              <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40 group-focus-within:text-black transition-colors" />
+              <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-teal-600 transition-colors" />
               <input 
                 type="text"
                 placeholder="Full Name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="w-full h-12 bg-white border border-[#141414] pl-12 pr-4 font-sans focus:outline-none focus:ring-1 focus:ring-black"
+                className="w-full h-12 bg-white border border-slate-300 pl-12 pr-4 font-sans font-medium text-slate-900 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 rounded-lg transition-shadow"
               />
             </div>
           )}
 
           <div className="relative group">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40 group-focus-within:text-black transition-colors" />
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-teal-600 transition-colors" />
             <input 
               type="email"
               placeholder="University Email Address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full h-12 bg-white border border-[#141414] pl-12 pr-4 font-sans focus:outline-none focus:ring-1 focus:ring-black"
+              className="w-full h-12 bg-white border border-slate-300 pl-12 pr-4 font-sans font-medium text-slate-900 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 rounded-lg transition-shadow"
             />
           </div>
 
           <div className="relative group">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40 group-focus-within:text-black transition-colors" />
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-teal-600 transition-colors" />
             <input 
               type="password"
               placeholder="Password (Min 6 chars)"
@@ -141,18 +141,18 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full h-12 bg-white border border-[#141414] pl-12 pr-4 font-sans focus:outline-none focus:ring-1 focus:ring-black"
+              className="w-full h-12 bg-white border border-slate-300 pl-12 pr-4 font-sans font-medium text-slate-900 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 rounded-lg transition-shadow"
             />
           </div>
 
           {error && (
-            <p className="text-red-500 text-xs mt-2">{error}</p>
+            <p className="text-red-500 font-medium text-xs mt-2 bg-red-50 p-2 rounded">{error}</p>
           )}
 
           <button 
             type="submit"
             disabled={isLoading}
-            className="w-full h-12 bg-[#141414] text-[#FAF9F6] font-mono text-xs uppercase tracking-widest hover:bg-black/90 transition-colors flex items-center justify-center gap-2 mt-4"
+            className="w-full h-12 bg-slate-900 text-white font-mono font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 mt-4 rounded-lg shadow-sm"
           >
             {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
             {isLogin ? 'Sign In' : 'Sign Up'}
@@ -160,25 +160,25 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         </form>
 
         <div className="my-6 flex items-center gap-4">
-          <div className="flex-1 h-px bg-black/10"></div>
-          <span className="font-mono text-[10px] text-black/40 uppercase tracking-widest">or</span>
-          <div className="flex-1 h-px bg-black/10"></div>
+          <div className="flex-1 h-px bg-slate-200"></div>
+          <span className="font-mono font-bold text-[10px] text-slate-400 uppercase tracking-widest">or</span>
+          <div className="flex-1 h-px bg-slate-200"></div>
         </div>
 
         <button 
           onClick={handleGoogleAuth}
           disabled={isLoading}
-          className="w-full h-12 bg-white border border-[#141414] text-[#141414] font-mono text-xs uppercase tracking-widest hover:bg-black/5 transition-colors flex items-center justify-center gap-3"
+          className="w-full h-12 bg-white border border-slate-200 text-slate-700 font-mono font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors flex items-center justify-center gap-3 rounded-lg hover:border-slate-300"
         >
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-4 h-4" />
           Continue with Google
         </button>
 
-        <p className="text-center mt-8 text-xs text-black/60">
+        <p className="text-center mt-8 text-xs font-medium text-slate-500">
           {isLogin ? "Don't have an account? " : "Already have an account? "}
           <button 
             onClick={() => setIsLogin(!isLogin)}
-            className="font-bold underline hover:text-black transition-colors"
+            className="font-bold text-teal-600 hover:text-teal-700 hover:underline transition-colors"
           >
             {isLogin ? 'Sign up' : 'Sign in'}
           </button>

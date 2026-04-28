@@ -1,5 +1,5 @@
 {
-  "name": "UniTime: Daily Timetable Assistant",
+  "name": "Smart Time Table",
   "description": "A smart university timetable management system that uses AI to parse schedule images/PDFs and provides a personalized daily view of classes.",
   "requestFramePermissions": [],
   "majorCapabilities": []

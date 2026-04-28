@@ -102,48 +102,49 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="relative w-full max-w-lg overflow-hidden bg-[#FAF9F6] border border-[#141414] shadow-[8px_8px_0px_0px_rgba(20,20,20,1)] p-8"
+        className="relative w-full max-w-lg overflow-hidden bg-white border border-slate-200 shadow-xl p-8 rounded-2xl"
       >
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 p-1 transition-colors hover:bg-black/5"
+          className="absolute top-4 right-4 p-1 transition-colors text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
         >
           <X className="w-6 h-6" />
         </button>
 
-        <h2 className="text-3xl font-serif italic mb-2">New Timetable</h2>
-        <p className="text-sm text-black/60 mb-8">
+        <h2 className="text-3xl font-display mb-2 font-bold text-slate-900">New Timetable</h2>
+        <p className="text-sm font-medium text-slate-500 mb-8">
           Upload an image or PDF. Our AI will automatically extract classes, subjects, and rooms.
         </p>
 
         <div 
           {...getRootProps()} 
           className={cn(
-            "relative group cursor-pointer border-2 border-dashed aspect-video flex flex-col items-center justify-center transition-all",
-            isDragActive ? "border-black bg-black/5" : "border-black/20 hover:border-black/40",
+            "relative group cursor-pointer border-2 border-dashed aspect-video flex flex-col items-center justify-center transition-all rounded-xl",
+            isDragActive ? "border-teal-500 bg-teal-50" : "border-slate-300 hover:border-teal-400",
             isProcessing && "pointer-events-none opacity-50"
           )}
         >
           <input {...getInputProps()} />
+          
           
           <AnimatePresence mode="wait">
             {isProcessing ? (
               <motion.div 
                 key="processing"
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="flex flex-col items-center"
+                className="flex flex-col items-center text-slate-900"
               >
                 <Loader2 className="w-12 h-12 animate-spin mb-4" />
-                <p className="font-mono text-xs uppercase tracking-widest">AI is reading file...</p>
+                <p className="font-mono font-bold text-xs uppercase tracking-widest text-slate-500">AI is reading file...</p>
               </motion.div>
             ) : success ? (
               <motion.div 
                 key="success"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                className="flex flex-col items-center text-green-600"
+                className="flex flex-col items-center text-teal-600"
               >
                 <CheckCircle2 className="w-12 h-12 mb-4" />
-                <p className="font-mono text-xs uppercase tracking-widest font-bold">Successfully Stored!</p>
+                <p className="font-mono font-bold text-xs uppercase tracking-widest text-teal-700">Successfully Stored!</p>
               </motion.div>
             ) : (
               <motion.div 
@@ -151,9 +152,9 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="flex flex-col items-center text-center px-4"
               >
-                <Upload className="w-12 h-12 mb-4 opacity-20 group-hover:opacity-100 transition-opacity" />
-                <p className="font-sans font-medium mb-1">Click or drag & drop</p>
-                <p className="text-xs text-black/40">PNG, JPG or PDF up to 10MB</p>
+                <Upload className="w-12 h-12 mb-4 opacity-50 text-slate-400 group-hover:text-teal-600 group-hover:opacity-100 transition-colors" />
+                <p className="font-sans font-bold text-slate-900 mb-1">Click or drop image</p>
+                <p className="text-xs font-medium text-slate-500">PNG, JPG or PDF up to 10MB</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -173,7 +174,7 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
           <button 
             disabled={isProcessing}
             onClick={onClose}
-            className="px-6 py-2 font-mono text-xs uppercase tracking-widest hover:underline"
+            className="px-6 py-2 font-mono font-bold text-xs uppercase text-slate-500 tracking-widest hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
           >
             Cancel
           </button>
