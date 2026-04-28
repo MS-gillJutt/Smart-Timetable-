@@ -4,7 +4,7 @@ import { Upload, Loader2, X, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { parseTimetable } from '../lib/gemini';
 import { db, auth } from '../lib/firebase';
-import { collection, addDoc, serverTimestamp, writeBatch, doc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, writeBatch, doc, query, where, getDocs } from 'firebase/firestore';
 import { cn } from '../lib/utils';
 
 interface UploadModalProps {
@@ -39,6 +39,15 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
     }
 
     try {
+      // Check if user already has a timetable
+      const existingQ = query(collection(db, 'timetables'), where('userId', '==', auth.currentUser.uid));
+      const existingSnap = await getDocs(existingQ);
+      if (!existingSnap.empty) {
+        setError('You can only have ONE timetable at a time. Please delete your existing timetable before uploading a new one.');
+        setIsProcessing(false);
+        return;
+      }
+
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve) => {
         reader.onload = () => {

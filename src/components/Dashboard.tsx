@@ -20,6 +20,7 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
   const [viewMode, setViewMode] = useState<'daily' | 'grid'>('daily');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'mine'>('all');
+  const [selectedDay, setSelectedDay] = useState<string>(getCurrentDay());
 
   const currentDay = getCurrentDay();
 
@@ -97,6 +98,17 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
     }
   };
 
+  const handleTimetableChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newId = e.target.value;
+    setSelectedTimetableId(newId);
+    const tbl = timetables.find(t => t.id === newId);
+    if (tbl && tbl.classes.length > 0) {
+      setSelectedClassName(tbl.classes[0]);
+    } else {
+      setSelectedClassName('');
+    }
+  };
+
   const filteredTimetables = timetables.filter(t => {
     const matchesSearch = t.department.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           t.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -109,7 +121,7 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
 
   const selectedTimetable = timetables.find(t => t.id === selectedTimetableId);
   const filteredLectures = lectures.filter(l => l.className === selectedClassName);
-  const todayLectures = filteredLectures.filter(l => l.day === currentDay).sort((a,b) => (a.slotIndex || 0) - (b.slotIndex || 0));
+  const todayLectures = filteredLectures.filter(l => l.day === selectedDay).sort((a,b) => (a.slotIndex || 0) - (b.slotIndex || 0));
 
   if (loading) {
     return (
@@ -239,10 +251,23 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
             </div>
           </motion.div>
 
-          {/* Toggle View */}
-          <div className="flex justify-between items-center">
-            <h2 className="text-3xl font-display font-bold text-slate-900">Your Schedule</h2>
-            <div className="flex bg-slate-100 p-1 rounded-lg">
+            <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <h2 className="text-3xl font-display font-bold text-slate-900">Your Schedule</h2>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono font-bold uppercase text-slate-400">View Day:</span>
+                  <select 
+                    value={selectedDay}
+                    onChange={(e) => setSelectedDay(e.target.value)}
+                    className="bg-white border border-slate-200 text-sm font-bold text-teal-700 px-3 py-1 rounded-md shadow-sm outline-none focus:ring-1 focus:ring-teal-500"
+                  >
+                    {DAYS.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex bg-slate-100 p-1 rounded-lg">
               <button 
                 onClick={() => setViewMode('daily')}
                 className={cn("px-3 py-2 transition-all font-bold rounded-md flex items-center gap-2", viewMode === 'daily' ? "bg-white text-teal-700 shadow-sm" : "text-slate-500 hover:text-slate-900")}
@@ -274,9 +299,9 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
                 }}
                 className="space-y-4"
               >
-                <h3 className="font-mono font-bold text-xs uppercase tracking-widest mb-6 text-slate-500">Today's Lectures ({currentDay})</h3>
+                <h3 className="font-mono font-bold text-xs uppercase tracking-widest mb-6 text-slate-500">Lectures for {selectedDay} {selectedDay === currentDay && "(Today)"}</h3>
                 {todayLectures.length === 0 ? (
-                  <p className="py-12 text-center text-slate-400 font-medium font-sans">No lectures scheduled for today. Enjoy your break!</p>
+                  <p className="py-12 text-center text-slate-400 font-medium font-sans">No lectures scheduled for {selectedDay}. Enjoy your break!</p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {todayLectures.map((lecture, i) => (
@@ -336,8 +361,8 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
                   </thead>
                   <tbody>
                     {DAYS.map(day => (
-                      <tr key={day} className={cn("transition-colors", day === currentDay ? "bg-teal-50/50" : "hover:bg-slate-50/50")}>
-                        <td className="p-4 font-sans font-bold text-sm border-r border-b border-slate-200 bg-slate-50 text-slate-900">{day.slice(0,3)}</td>
+                      <tr key={day} className={cn("transition-colors", day === selectedDay ? "bg-teal-50/50" : (day === currentDay ? "bg-slate-50/80" : "hover:bg-slate-50/50"))}>
+                        <td className={cn("p-4 font-sans font-bold text-sm border-r border-b border-slate-200 text-slate-900", day === selectedDay ? "bg-teal-600 text-white" : "bg-slate-50")}>{day.slice(0,3)}</td>
                         {[...Array(12)].map((_, i) => {
                           const lect = filteredLectures.find(l => l.day === day && (l.slotIndex === i + 1));
                           return (
