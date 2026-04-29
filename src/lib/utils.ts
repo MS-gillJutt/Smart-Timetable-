@@ -10,6 +10,18 @@ export function getCurrentDay() {
   return days[new Date().getDay()];
 }
 
+export function getFormattedDateForDay(dayName: string) {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const targetDayIdx = days.indexOf(dayName);
+  if (targetDayIdx === -1) return '';
+  const now = new Date();
+  const currentDayIdx = now.getDay();
+  const diff = targetDayIdx - currentDayIdx;
+  const targetDate = new Date(now);
+  targetDate.setDate(now.getDate() + diff);
+  return targetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 export function formatTime24To12(time: string) {
   if (!time) return '';
   const [hours, minutes] = time.split(':').map(Number);

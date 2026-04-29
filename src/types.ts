@@ -8,6 +8,7 @@ export interface Timetable {
   name: string;
   department: string;
   createdBy: string;
+  creatorEmail?: string;
   userId?: string;
   createdAt: any; // Firestore Timestamp
   classes: string[];

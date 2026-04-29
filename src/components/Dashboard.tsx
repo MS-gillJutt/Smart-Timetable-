@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
-import { Calendar, Clock, MapPin, User, Search, Trash2, AlertTriangle, ChevronRight, LayoutGrid, List } from 'lucide-react';
+import { useState, useEffect, ChangeEvent } from 'react';
+import { Calendar, Clock, MapPin, User, Search, Trash2, AlertTriangle, ChevronRight, LayoutGrid, List, X } from 'lucide-react';
 import { db, auth } from '../lib/firebase';
+import { collection, query, where, getDocs, onSnapshot, orderBy, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import { Timetable, Lecture, DAYS } from '../types';
-import { cn, getCurrentDay } from '../lib/utils';
+import { cn, getCurrentDay, getFormattedDateForDay } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { localDb } from '../lib/storage';
 
 interface DashboardProps {
   onAddClick: () => void;
@@ -22,61 +22,144 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
   const [filterMode, setFilterMode] = useState<'all' | 'mine'>('all');
   const [selectedDay, setSelectedDay] = useState<string>(getCurrentDay());
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const currentDay = getCurrentDay();
 
   // Time tracking for highlighting
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const loadLocalData = () => {
-    const localTimetables = localDb.getTimetables();
-    setTimetables(localTimetables);
-    if (localTimetables.length > 0 && !selectedTimetableId) {
-      setSelectedTimetableId(localTimetables[0].id);
-      if (localTimetables[0].classes.length > 0) {
-        setSelectedClassName(localTimetables[0].classes[0]);
-      }
-    }
-    setLoading(false);
-  };
-
   useEffect(() => {
-    loadLocalData();
-    
-    // Optional: listen to storage events if multiple tabs are open
-    const handleStorage = () => loadLocalData();
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    const q = query(collection(db, 'timetables'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Timetable));
+      setTimetables(data);
+      if (data.length > 0 && !selectedTimetableId) {
+        setSelectedTimetableId(data[0].id);
+        if (data[0].classes.length > 0) {
+          setSelectedClassName(data[0].classes[0]);
+        }
+      }
+      setLoading(false);
+    });
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
     if (!selectedTimetableId) return;
-    const allLectures = localDb.getLectures();
-    setLectures(allLectures.filter(l => l.timetableId === selectedTimetableId));
+    
+    const q = query(
+      collection(db, 'lectures'), 
+      where('timetableId', '==', selectedTimetableId)
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Lecture));
+      setLectures(data);
+    });
+    
+    return unsubscribe;
   }, [selectedTimetableId]);
 
-  const handleDelete = async () => {
-    if (!selectedTimetableId) return;
-    if (!window.confirm("WARNING: Are you sure you want to delete this entire timetable? This action cannot be undone.")) return;
+  const initiateDelete = () => {
+    console.log("Delete button clicked. Selected ID:", selectedTimetableId);
     
+    if (!selectedTimetableId) {
+      alert("Please select a timetable first.");
+      return;
+    }
+
+    if (!auth.currentUser) {
+      alert("You must be signed in to delete.");
+      return;
+    }
+
+    const currentEmail = auth.currentUser.email;
+    const currentUid = auth.currentUser.uid;
+    const isAdmin = currentEmail === 'aligilljutt150@gmail.com';
+    
+    const targetTimetable = timetables.find(t => t.id === selectedTimetableId);
+    
+    if (!targetTimetable) {
+      if (!isAdmin) {
+        alert("Timetable metadata not found. Please refresh.");
+        return;
+      }
+    }
+
+    const isOwner = targetTimetable?.userId === currentUid;
+    const wasCreatedByAdmin = targetTimetable?.creatorEmail === 'aligilljutt150@gmail.com';
+
+    // Permission logic: Admin deletes all. Users delete their own non-admin-created ones.
+    if (!isAdmin && (!isOwner || wasCreatedByAdmin)) {
+      alert("Permission Denied: You cannot delete this timetable.");
+      return;
+    }
+
+    setShowDeleteConfirm(true);
+  };
+
+  const executeDelete = async () => {
+    console.log("executeDelete initiated for ID:", selectedTimetableId);
+    setShowDeleteConfirm(false);
     setIsDeleting(true);
+    
     try {
-      localDb.deleteTimetable(selectedTimetableId);
+      const batch = writeBatch(db);
+      
+      console.log("Querying lectures for deletion...");
+      const lecturesQ = query(collection(db, 'lectures'), where('timetableId', '==', selectedTimetableId));
+      const lecturesSnap = await getDocs(lecturesQ);
+      
+      console.log(`Found ${lecturesSnap.size} lectures to delete.`);
+      
+      lecturesSnap.forEach(d => {
+        batch.delete(doc(db, 'lectures', d.id));
+      });
+      
+      batch.delete(doc(db, 'timetables', selectedTimetableId));
+      
+      console.log("Committing batch delete...");
+      await batch.commit();
+      
       setSelectedTimetableId('');
       setSelectedClassName('');
-      loadLocalData();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to delete timetable.");
+      setLectures([]);
+      alert("Timetable deleted successfully.");
+    } catch (err: any) {
+      console.error("Critical delete error:", err);
+      alert(`Delete operation failed: ${err.message || "Please check your connection and try again."}`);
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const handleTimetableChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleDeleteLecture = async (lectureId: string) => {
+    if (!auth.currentUser) return;
+
+    const isAdmin = auth.currentUser.email === 'aligilljutt150@gmail.com';
+    const isOwner = selectedTimetable?.userId === auth.currentUser?.uid;
+    const wasCreatedByAdmin = selectedTimetable?.creatorEmail === 'aligilljutt150@gmail.com';
+
+    if (!isAdmin && (!isOwner || wasCreatedByAdmin)) {
+      alert("Permission denied. You cannot delete lectures from this timetable.");
+      return;
+    }
+
+    if (!window.confirm("Are you sure you want to delete this lecture slot?")) return;
+
+    try {
+      await deleteDoc(doc(db, 'lectures', lectureId));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete lecture.");
+    }
+  };
+
+  const handleTimetableChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const newId = e.target.value;
     setSelectedTimetableId(newId);
     const tbl = timetables.find(t => t.id === newId);
@@ -90,6 +173,9 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
   const filteredTimetables = timetables.filter(t => {
     const matchesSearch = t.department.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           t.name.toLowerCase().includes(searchQuery.toLowerCase());
+    if (filterMode === 'mine') {
+      return matchesSearch && auth.currentUser && t.userId === auth.currentUser.uid;
+    }
     return matchesSearch;
   });
 
@@ -124,10 +210,10 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
   };
 
   const getLectureColors = (status: string) => {
-    if (status === 'CURRENT') return 'bg-emerald-50 border-emerald-400 ring-2 ring-emerald-400 shadow-md';
-    if (status === 'UPCOMING') return 'bg-yellow-50 border-yellow-300';
-    if (status === 'PAST') return 'bg-red-50 border-red-200 opacity-80';
-    return 'bg-white border-slate-200 hover:shadow-md hover:border-amber-200';
+    if (status === 'CURRENT') return 'bg-emerald-50 border-2 border-emerald-500 ring-4 ring-emerald-100 shadow-lg scale-[1.02] z-10';
+    if (status === 'UPCOMING') return 'bg-amber-50/50 border-2 border-amber-400 shadow-sm';
+    if (status === 'PAST') return 'bg-slate-50 border-2 border-red-300 opacity-70 grayscale-[0.2]';
+    return 'bg-white border-2 border-slate-100 hover:shadow-md hover:border-teal-200';
   };
 
   if (loading) {
@@ -140,6 +226,39 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
+      {/* Real-time Digital Clock Section */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-12 p-8 bg-slate-900 text-white rounded-[2.5rem] shadow-2xl overflow-hidden relative group border border-slate-800"
+      >
+        <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+          <Clock className="w-48 h-48 rotate-12" />
+        </div>
+        
+        <div className="relative z-10 flex flex-col md:flex-row md:items-end gap-4 md:gap-8">
+          <div className="flex flex-col">
+            <span className="text-[10px] md:text-xs font-mono font-black uppercase tracking-[0.3em] text-teal-400 mb-2">Live System Time</span>
+            <div className="text-5xl md:text-7xl lg:text-8xl font-mono font-black tracking-tighter tabular-nums flex items-baseline">
+              {currentTime.toLocaleTimeString([], { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' }).split(' ')[0]}
+              <span className="text-xl md:text-3xl lg:text-4xl ml-2 text-teal-500">
+                {currentTime.toLocaleTimeString([], { hour12: true }).split(' ')[1]}
+              </span>
+            </div>
+          </div>
+          
+          <div className="flex flex-col mb-1 md:mb-3 pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-white/10 md:pl-8">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs md:text-sm font-mono font-bold uppercase tracking-widest text-white/50">{currentDay}</span>
+            </div>
+            <span className="text-2xl md:text-4xl font-display font-black text-white leading-none">
+              {currentTime.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+            </span>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Search & Selection Header */}
       <div className="space-y-6 mb-12">
         <div className="relative group">
@@ -157,12 +276,28 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
           <div className="flex-1 w-full space-y-2">
             <div className="flex items-center justify-between">
               <label className="font-mono font-bold text-[10px] uppercase tracking-widest text-slate-500">Select Timetable Source</label>
+              {auth.currentUser && (
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setFilterMode('all')}
+                    className={cn("font-mono font-bold text-[9px] uppercase tracking-widest px-2 py-1 transition-colors rounded", filterMode === 'all' ? "bg-teal-700 text-white" : "text-slate-500 hover:text-teal-700 hover:bg-teal-50")}
+                  >
+                    All
+                  </button>
+                  <button 
+                    onClick={() => setFilterMode('mine')}
+                    className={cn("font-mono font-bold text-[9px] uppercase tracking-widest px-2 py-1 transition-colors rounded", filterMode === 'mine' ? "bg-teal-700 text-white" : "text-slate-500 hover:text-teal-700 hover:bg-teal-50")}
+                  >
+                    Mine
+                  </button>
+                </div>
+              )}
             </div>
             <div className="relative">
               <select 
                 value={selectedTimetableId}
                 onChange={handleTimetableChange}
-                className="w-full h-12 bg-white border border-slate-300 px-4 font-sans font-bold text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 appearance-none cursor-pointer rounded-lg shadow-sm transition-all"
+                className="w-full h-12 bg-white border border-slate-300 px-4 font-sans font-bold text-slate-900 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer rounded-lg shadow-sm transition-all"
               >
                 <option value="">Select a timetable...</option>
                 {filteredTimetables.map(t => (
@@ -179,10 +314,10 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
             <select 
               value={selectedClassName}
               onChange={(e) => setSelectedClassName(e.target.value)}
-              className="w-full h-12 bg-white border border-slate-300 px-4 font-sans font-bold text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 appearance-none cursor-pointer rounded-lg shadow-sm transition-all"
+              className="w-full h-12 bg-white border border-slate-300 px-4 font-sans font-bold text-slate-900 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer rounded-lg shadow-sm transition-all"
             >
               <option value="">Select a class...</option>
-              {selectedTimetable?.classes.map(c => (
+              {selectedTimetable?.classes?.map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
@@ -193,15 +328,16 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
         <div className="flex gap-2">
           <button 
             onClick={onAddClick}
-            className="h-12 px-6 bg-blue-900 text-white font-mono font-bold text-xs uppercase tracking-widest hover:bg-blue-800 transition-colors rounded-lg shadow-sm"
+            className="h-12 px-6 bg-teal-700 text-white font-mono font-bold text-xs uppercase tracking-widest hover:bg-teal-600 transition-colors rounded-lg shadow-sm whitespace-nowrap"
           >
-            Update / Add
+            Upload
           </button>
-          {selectedTimetableId && (
+          {selectedTimetableId && auth.currentUser && (auth.currentUser.email === 'aligilljutt150@gmail.com' || (selectedTimetable?.userId === auth.currentUser.uid && selectedTimetable?.creatorEmail !== 'aligilljutt150@gmail.com')) && (
             <button 
               disabled={isDeleting}
-              onClick={handleDelete}
+              onClick={initiateDelete}
               className="h-12 w-12 flex items-center justify-center border border-red-200 text-red-500 hover:bg-red-50 transition-colors rounded-lg"
+              title="Delete Timetable"
             >
               <Trash2 className="w-5 h-5" />
             </button>
@@ -233,12 +369,12 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
             <div className="space-y-1">
               <span className="font-mono font-bold text-[9px] uppercase text-slate-400">Generated On</span>
               <p className="font-sans text-sm font-bold text-slate-900">
-                {selectedTimetable?.createdAt ? new Date(selectedTimetable.createdAt).toLocaleDateString() : 'Recently'}
+                {selectedTimetable?.createdAt?.toDate ? selectedTimetable.createdAt.toDate().toLocaleDateString() : 'Recently'}
               </p>
             </div>
             <div className="space-y-1">
               <span className="font-mono font-bold text-[9px] uppercase text-slate-400">Today</span>
-              <p className="font-sans text-sm font-bold text-blue-600">{currentDay}</p>
+              <p className="font-sans text-sm font-bold text-teal-600">{currentDay}</p>
             </div>
           </motion.div>
 
@@ -250,7 +386,7 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
                   <select 
                     value={selectedDay}
                     onChange={(e) => setSelectedDay(e.target.value)}
-                    className="bg-white border border-slate-200 text-sm font-bold text-blue-700 px-3 py-1 rounded-md shadow-sm outline-none focus:ring-1 focus:ring-blue-500"
+                    className="bg-white border border-slate-200 text-sm font-bold text-teal-700 px-3 py-1 rounded-md shadow-sm outline-none focus:ring-1 focus:ring-teal-500"
                   >
                     {DAYS.map(d => (
                       <option key={d} value={d}>{d}</option>
@@ -261,14 +397,14 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
               <div className="flex bg-slate-100 p-1 rounded-lg">
               <button 
                 onClick={() => setViewMode('daily')}
-                className={cn("px-3 py-2 transition-all font-bold rounded-md flex items-center gap-2", viewMode === 'daily' ? "bg-white text-blue-900 shadow-sm" : "text-slate-500 hover:text-slate-900")}
+                className={cn("px-3 py-2 transition-all font-bold rounded-md flex items-center gap-2", viewMode === 'daily' ? "bg-white text-teal-700 shadow-sm" : "text-slate-500 hover:text-slate-900")}
               >
                 <List className="w-4 h-4" />
                 <span className="text-xs hidden sm:block">Daily</span>
               </button>
               <button 
                 onClick={() => setViewMode('grid')}
-                className={cn("px-3 py-2 transition-all font-bold rounded-md flex items-center gap-2", viewMode === 'grid' ? "bg-white text-blue-900 shadow-sm" : "text-slate-500 hover:text-slate-900")}
+                className={cn("px-3 py-2 transition-all font-bold rounded-md flex items-center gap-2", viewMode === 'grid' ? "bg-white text-teal-700 shadow-sm" : "text-slate-500 hover:text-slate-900")}
               >
                 <LayoutGrid className="w-4 h-4" />
                 <span className="text-xs hidden sm:block">Grid</span>
@@ -313,29 +449,47 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
                              <div className="absolute top-0 right-0 left-0 h-1 bg-emerald-500 animate-pulse" />
                            )}
                            <div className="flex justify-between items-start mb-6">
-                              <div className={cn(
-                                "px-3 py-1 font-mono font-bold rounded-md text-[10px] border",
-                                status === 'CURRENT' ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
-                                status === 'UPCOMING' ? "bg-amber-100 text-amber-900 border-amber-200" :
-                                status === 'PAST' ? "bg-red-100 text-red-900 border-red-200" :
-                                "bg-slate-100 text-slate-600 border-slate-200"
-                              )}>
-                                SLOT {lecture.slotIndex}
+                              <div>
+                                <div className={cn(
+                                  "text-lg sm:text-2xl font-mono font-black tracking-tight leading-none",
+                                  status === 'CURRENT' ? "text-emerald-700" :
+                                  status === 'UPCOMING' ? "text-amber-800" :
+                                  status === 'PAST' ? "text-red-700" : "text-slate-800"
+                                )}>
+                                  {lecture.startTime} <span className={cn("text-sm font-semibold mx-1", status === 'CURRENT' ? "text-emerald-600" : "text-slate-400")}>to</span> {lecture.endTime}
+                                </div>
+                                <div className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 mt-2">
+                                  <Calendar className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
+                                  {lecture.day} • {getFormattedDateForDay(lecture.day)}
+                                </div>
                               </div>
-                              <div className={cn(
-                                "flex items-center gap-2 font-medium",
-                                status === 'CURRENT' ? "text-emerald-700" :
-                                status === 'UPCOMING' ? "text-amber-800" :
-                                status === 'PAST' ? "text-red-700" : "text-slate-400"
-                              )}>
-                                <Clock className="w-4 h-4" />
-                                <span className="font-mono font-bold text-[10px]">{lecture.startTime} - {lecture.endTime}</span>
+                              <div className="flex flex-col items-end gap-2">
+                                <div className={cn(
+                                  "px-3 py-1 font-mono font-bold rounded-md text-[10px] border whitespace-nowrap",
+                                  status === 'CURRENT' ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
+                                  status === 'UPCOMING' ? "bg-amber-100 text-amber-900 border-amber-200" :
+                                  status === 'PAST' ? "bg-red-100 text-red-900 border-red-200" :
+                                  "bg-slate-100 text-slate-600 border-slate-200"
+                                )}>
+                                  SLOT {lecture.slotIndex}
+                                </div>
+                                {auth.currentUser && (auth.currentUser.email === 'aligilljutt150@gmail.com' || (selectedTimetable?.userId === auth.currentUser.uid && selectedTimetable?.creatorEmail !== 'aligilljutt150@gmail.com')) && (
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteLecture(lecture.id);
+                                    }}
+                                    className="p-1 px-2 text-[9px] font-mono font-bold uppercase text-red-500 hover:bg-red-50 rounded border border-red-100 transition-colors"
+                                  >
+                                    Delete Slot
+                                  </button>
+                                )}
                               </div>
                            </div>
                            <h4 className={cn(
                              "text-xl font-display font-bold leading-tight mb-4 transition-colors",
                              status === 'CURRENT' ? "text-emerald-900" :
-                             status === 'PAST' ? "text-red-900" : "text-slate-900 group-hover:text-amber-700"
+                             status === 'PAST' ? "text-red-900" : "text-slate-900 group-hover:text-teal-700"
                            )}>
                              {lecture.subject}
                            </h4>
@@ -397,14 +551,22 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
                   </thead>
                   <tbody>
                     {DAYS.map(day => (
-                      <tr key={day} className={cn("transition-colors", day === selectedDay ? "bg-amber-50/50" : (day === currentDay ? "bg-slate-50/80" : "hover:bg-slate-50/50"))}>
-                        <td className={cn("p-4 font-sans font-bold text-sm border-r border-b border-slate-200 text-slate-900", day === selectedDay ? "bg-blue-900 text-white" : "bg-slate-50")}>{day.slice(0,3)}</td>
+                      <tr key={day} className={cn("transition-colors", day === selectedDay ? "bg-teal-50/50" : (day === currentDay ? "bg-slate-50/80" : "hover:bg-slate-50/50"))}>
+                        <td className={cn("p-4 font-sans font-bold text-sm border-r border-b border-slate-200 text-slate-900", day === selectedDay ? "bg-teal-600 text-white" : "bg-slate-50")}>{day.slice(0,3)}</td>
                         {[...Array(12)].map((_, i) => {
                           const lect = filteredLectures.find(l => l.day === day && (l.slotIndex === i + 1));
                           return (
-                            <td key={i} className="p-2 border-r border-b border-slate-100 min-w-[140px] align-top bg-white">
+                            <td key={i} className="p-2 border-r border-b border-slate-100 min-w-[140px] align-top bg-white group/cell">
                               {lect ? (
-                                <div className="text-[10px] leading-tight flex flex-col h-full justify-between p-1.5 rounded bg-white">
+                                <div className="text-[10px] leading-tight flex flex-col h-full justify-between p-1.5 rounded bg-white relative">
+                                  {auth.currentUser && (auth.currentUser.email === 'aligilljutt150@gmail.com' || (selectedTimetable?.userId === auth.currentUser.uid && selectedTimetable?.creatorEmail !== 'aligilljutt150@gmail.com')) && (
+                                    <button 
+                                      onClick={() => handleDeleteLecture(lect.id)}
+                                      className="absolute -top-1 -right-1 p-1 bg-red-100 text-red-600 rounded-full opacity-0 group-hover/cell:opacity-100 transition-opacity shadow-sm"
+                                    >
+                                      <X className="w-2.5 h-2.5" />
+                                    </button>
+                                  )}
                                   <div className="font-bold mb-1 line-clamp-2 text-slate-900">{lect.subject}</div>
                                   <div className="text-slate-500 font-medium">{lect.teacher}</div>
                                   <div className="mt-2 font-mono font-bold text-[9px] text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded inline-block w-fit">{lect.room}</div>
@@ -426,6 +588,47 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
           </AnimatePresence>
         </div>
       )}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md bg-white p-8 rounded-2xl shadow-2xl border border-slate-200"
+            >
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6 mx-auto">
+                <AlertTriangle className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className="text-2xl font-display font-bold text-slate-900 text-center mb-2">Delete Timetable?</h3>
+              <p className="text-slate-500 text-center mb-8">This will permanently remove "{selectedTimetable?.name}" and all its lecture slots. This action cannot be undone.</p>
+              
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button 
+                  onClick={executeDelete}
+                  disabled={isDeleting}
+                  className="flex-1 h-12 bg-red-600 text-white font-mono font-bold text-[10px] uppercase tracking-widest rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-200 flex items-center justify-center gap-2 px-4"
+                >
+                  {isDeleting ? (
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : <Trash2 className="w-4 h-4" />}
+                  Confirm Delete
+                </button>
+                <button 
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={isDeleting}
+                  className="flex-1 h-12 bg-slate-100 text-slate-600 font-mono font-bold text-[10px] uppercase tracking-widest rounded-xl hover:bg-slate-200 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

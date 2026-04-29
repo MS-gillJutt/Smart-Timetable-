@@ -28,7 +28,9 @@ service cloud.firestore {
              data.department is string && data.department.size() > 0 &&
              data.createdBy is string &&
              data.userId == request.auth.uid &&
-             data.createdAt == request.time;
+             data.createdAt == request.time &&
+             data.classes is list &&
+             (data.creatorEmail == null || data.creatorEmail is string);
     }
 
     function isValidLecture(data) {
@@ -48,7 +50,10 @@ service cloud.firestore {
     match /lectures/{lectureId} {
       allow read: if true;
       allow create: if isSignedIn() && isValidLecture(request.resource.data);
-      allow delete: if isSignedIn(); // Normally restricted to parent owner, acceptable for simplicity
+      allow delete: if isSignedIn() && (
+        get(/databases/$(database)/documents/timetables/$(resource.data.timetableId)).data.userId == request.auth.uid || 
+        isAdmin()
+      );
       allow list: if true;
     }
   }

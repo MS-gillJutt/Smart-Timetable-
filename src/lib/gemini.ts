@@ -1,100 +1,76 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { Lecture, DAY_MAP } from "../types";
+import { Lecture } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-export async function parseTimetable(base64Data: string, mimeType: string): Promise<{
+export async function parseTimetable(base64Data: string, mimeType: string, fileName?: string): Promise<{
   name: string;
   department: string;
   createdBy: string;
   classes: string[];
   lectures: Omit<Lecture, 'id' | 'timetableId'>[];
 }> {
+  console.log(`Starting AI extraction for ${fileName} (${mimeType})...`);
+  console.time("AI_Total_Time");
+
   const prompt = `
-    Analyze this document/image.
-    First, determine if the document actually represents a university or school timetable / schedule. 
-    If the document does not look like a timetable (e.g., it is a book, a random picture, or unrelated text), set "isTimetable" to false.
-    If it is a timetable:
-    Extract the following information in JSON format:
-    1. Timetable meta-info: name (e.g. "BSCS 6 M" or "Timetable 2026"), department, createdBy (e.g. who signed it).
-    2. A flat list of every lecture slot found.
+    Analyze this university timetable document. FileName: "${fileName || 'Unknown'}".
     
-    CRITICAL INSTRUCTIONS:
-    - If a specific piece of metadata (name, department, creator) is not found, use "Unknown". Do not leave it empty.
-    - Extract ALL lectures from the image.
-    - Structure the response exactly as follows:
-    {
-      "isTimetable": true,
-      "name": "Class Name",
-      "department": "Department Name",
-      "createdBy": "Person Name",
-      "classes": ["Class 1", "Class 2"],
-      "lectures": [
-        {
-          "day": "Monday",
-          "startTime": "8:00 AM",
-          "endTime": "9:00 AM",
-          "subject": "Artificial Intelligence Lab",
-          "teacher": "Sameen Fatima",
-          "room": "4.G.20 (CS Lab)",
-          "className": "BSCS 6 M",
-          "slotIndex": 1
-        }
-      ]
-    }
-    
-    Note:
-    - Days should be full names (Monday, Tuesday, etc.).
-    - If a cell is empty or indicates a break, do not create a lecture for it.
-    - Return valid JSON only.
+    1. Extract Meta Info:
+       - name: Short descriptive name (e.g., "BSCS-6M").
+       - department: Department name.
+       - createdBy: Issuing authority or creator.
+       - classes: List of unique section/class identifiers.
+
+    2. Extract ALL Lecture Slots:
+       - Map each slot to its respective "day" (full name), "startTime", "endTime", "subject", "teacher", "room", and "className".
+       - "slotIndex" should be the period number (1, 2, 3...).
+
+    CRITICAL: Extract ALL data from ALL pages. If this is a multi-page PDF, process every page carefully and extract every single lecture slot mentioned.
+    Return ONLY JSON.
   `;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
-    contents: [
-      {
-        parts: [
-          { text: prompt + "\nFollow the schema exactly." },
-          { inlineData: { mimeType, data: base64Data } }
-        ]
-      }
-    ],
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          isTimetable: { type: Type.BOOLEAN },
-          name: { type: Type.STRING },
-          department: { type: Type.STRING },
-          createdBy: { type: Type.STRING },
-          classes: { type: Type.ARRAY, items: { type: Type.STRING } },
-          lectures: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                day: { type: Type.STRING },
-                startTime: { type: Type.STRING },
-                endTime: { type: Type.STRING },
-                subject: { type: Type.STRING },
-                teacher: { type: Type.STRING },
-                room: { type: Type.STRING },
-                className: { type: Type.STRING },
-                slotIndex: { type: Type.NUMBER }
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [
+        { text: prompt },
+        { inlineData: { mimeType, data: base64Data } }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            isTimetable: { type: Type.BOOLEAN },
+            name: { type: Type.STRING },
+            department: { type: Type.STRING },
+            createdBy: { type: Type.STRING },
+            classes: { type: Type.ARRAY, items: { type: Type.STRING } },
+            lectures: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  day: { type: Type.STRING },
+                  startTime: { type: Type.STRING },
+                  endTime: { type: Type.STRING },
+                  subject: { type: Type.STRING },
+                  teacher: { type: Type.STRING },
+                  room: { type: Type.STRING },
+                  className: { type: Type.STRING },
+                  slotIndex: { type: Type.NUMBER }
+                }
               }
             }
           }
         }
       }
-    }
-  });
+    });
 
-  try {
-    let cleanText = response.text || "{}";
-    if (cleanText.startsWith("```json")) {
-      cleanText = cleanText.replace(/^```json/, "").replace(/```$/, "");
-    }
+    console.timeEnd("AI_Total_Time");
+    
+    const cleanText = response.text || "{}";
     const parsed = JSON.parse(cleanText);
 
     if (parsed.isTimetable === false) {
@@ -107,23 +83,23 @@ export async function parseTimetable(base64Data: string, mimeType: string): Prom
       : ['Unknown Class'];
     
     return {
-      name: (parsed.name || "Unknown").substring(0, 200),
-      department: parsed.department || "Unknown",
-      createdBy: parsed.createdBy || "Unknown",
+      name: (parsed.name && parsed.name !== "Unknown") ? parsed.name.substring(0, 200) : fileName?.split('.')[0] || "Timetable",
+      department: (parsed.department && parsed.department !== "Unknown") ? parsed.department : "General",
+      createdBy: (parsed.createdBy && parsed.createdBy !== "Unknown") ? parsed.createdBy : "Official",
       classes: sanitizedClasses,
       lectures: (parsed.lectures || []).map((l: any) => ({
         day: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].includes(l.day) ? l.day : 'Monday',
         startTime: l.startTime || '00:00',
         endTime: l.endTime || '00:00',
-        subject: l.subject || 'Unknown Subject',
-        teacher: l.teacher || 'Unknown',
+        subject: l.subject || 'Lecture',
+        teacher: l.teacher || 'TBA',
         room: l.room || 'TBA',
         className: l.className || (sanitizedClasses[0] || 'Unknown Class'),
         slotIndex: typeof l.slotIndex === 'number' ? l.slotIndex : 1
       }))
     };
-  } catch (e) {
-    console.error("Failed to parse AI response", response.text);
-    throw new Error("AI failed to provide valid structured data.");
+  } catch (e: any) {
+    console.error("AI Extraction Error:", e);
+    throw new Error(e.message || "AI failed to provide valid structured data.");
   }
 }
