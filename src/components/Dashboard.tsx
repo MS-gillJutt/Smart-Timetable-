@@ -137,28 +137,6 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
     }
   };
 
-  const handleDeleteLecture = async (lectureId: string) => {
-    if (!auth.currentUser) return;
-
-    const isAdmin = auth.currentUser.email === 'aligilljutt150@gmail.com';
-    const isOwner = selectedTimetable?.userId === auth.currentUser?.uid;
-    const wasCreatedByAdmin = selectedTimetable?.creatorEmail === 'aligilljutt150@gmail.com';
-
-    if (!isAdmin && (!isOwner || wasCreatedByAdmin)) {
-      alert("Permission denied. You cannot delete lectures from this timetable.");
-      return;
-    }
-
-    if (!window.confirm("Are you sure you want to delete this lecture slot?")) return;
-
-    try {
-      await deleteDoc(doc(db, 'lectures', lectureId));
-    } catch (err) {
-      console.error(err);
-      alert("Failed to delete lecture.");
-    }
-  };
-
   const handleTimetableChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const newId = e.target.value;
     setSelectedTimetableId(newId);
@@ -171,12 +149,39 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
   };
 
   const filteredTimetables = timetables.filter(t => {
-    const matchesSearch = t.department.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          t.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const query = searchQuery.toLowerCase();
+    const dept = t.department.toLowerCase();
+    const name = t.name.toLowerCase();
+    
+    // Better matching: prioritizes startsWith
+    const matchesSearch = dept.includes(query) || name.includes(query) || 
+                          dept.startsWith(query) || name.startsWith(query);
+                          
     if (filterMode === 'mine') {
       return matchesSearch && auth.currentUser && t.userId === auth.currentUser.uid;
     }
     return matchesSearch;
+  }).sort((a,b) => {
+    // Sort logic: exact matches first, then startsWith, then includes
+    const aDept = a.department.toLowerCase();
+    const bDept = b.department.toLowerCase();
+    const aName = a.name.toLowerCase();
+    const bName = b.name.toLowerCase();
+    const query = searchQuery.toLowerCase();
+
+    if (query === '') return 0;
+
+    const aExact = aDept === query || aName === query;
+    const bExact = bDept === query || bName === query;
+    if (aExact && !bExact) return -1;
+    if (!aExact && bExact) return 1;
+
+    const aStarts = aDept.startsWith(query) || aName.startsWith(query);
+    const bStarts = bDept.startsWith(query) || bName.startsWith(query);
+    if (aStarts && !bStarts) return -1;
+    if (!aStarts && bStarts) return 1;
+
+    return 0;
   });
 
   const selectedTimetable = timetables.find(t => t.id === selectedTimetableId);
@@ -230,29 +235,29 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-12 p-8 bg-slate-900 text-white rounded-[2.5rem] shadow-2xl overflow-hidden relative group border border-slate-800"
+        className="mb-8 p-6 bg-slate-900 text-white rounded-[2rem] shadow-xl overflow-hidden relative group border border-slate-800 max-w-2xl mx-auto"
       >
-        <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-          <Clock className="w-48 h-48 rotate-12" />
+        <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+          <Clock className="w-32 h-32 rotate-12" />
         </div>
         
-        <div className="relative z-10 flex flex-col md:flex-row md:items-end gap-4 md:gap-8">
-          <div className="flex flex-col">
-            <span className="text-[10px] md:text-xs font-mono font-black uppercase tracking-[0.3em] text-teal-400 mb-2">Live System Time</span>
-            <div className="text-5xl md:text-7xl lg:text-8xl font-mono font-black tracking-tighter tabular-nums flex items-baseline">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-center gap-6">
+          <div className="flex flex-col items-center md:items-start">
+            <span className="text-[10px] font-mono font-black uppercase tracking-[0.3em] text-teal-400 mb-1">Live System Time</span>
+            <div className="text-4xl md:text-6xl font-mono font-black tracking-tighter tabular-nums flex items-baseline">
               {currentTime.toLocaleTimeString([], { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' }).split(' ')[0]}
-              <span className="text-xl md:text-3xl lg:text-4xl ml-2 text-teal-500">
+              <span className="text-lg md:text-2xl ml-2 text-teal-500">
                 {currentTime.toLocaleTimeString([], { hour12: true }).split(' ')[1]}
               </span>
             </div>
           </div>
           
-          <div className="flex flex-col mb-1 md:mb-3 pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-white/10 md:pl-8">
+          <div className="flex flex-col items-center md:items-start pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-white/10 md:pl-8">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs md:text-sm font-mono font-bold uppercase tracking-widest text-white/50">{currentDay}</span>
+              <span className="text-xs font-mono font-bold uppercase tracking-widest text-white/50">{currentDay}</span>
             </div>
-            <span className="text-2xl md:text-4xl font-display font-black text-white leading-none">
+            <span className="text-xl md:text-2xl font-display font-black text-white leading-none">
               {currentTime.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
             </span>
           </div>
@@ -473,17 +478,6 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
                                 )}>
                                   SLOT {lecture.slotIndex}
                                 </div>
-                                {auth.currentUser && (auth.currentUser.email === 'aligilljutt150@gmail.com' || (selectedTimetable?.userId === auth.currentUser.uid && selectedTimetable?.creatorEmail !== 'aligilljutt150@gmail.com')) && (
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteLecture(lecture.id);
-                                    }}
-                                    className="p-1 px-2 text-[9px] font-mono font-bold uppercase text-red-500 hover:bg-red-50 rounded border border-red-100 transition-colors"
-                                  >
-                                    Delete Slot
-                                  </button>
-                                )}
                               </div>
                            </div>
                            <h4 className={cn(
@@ -559,14 +553,6 @@ export default function Dashboard({ onAddClick }: DashboardProps) {
                             <td key={i} className="p-2 border-r border-b border-slate-100 min-w-[140px] align-top bg-white group/cell">
                               {lect ? (
                                 <div className="text-[10px] leading-tight flex flex-col h-full justify-between p-1.5 rounded bg-white relative">
-                                  {auth.currentUser && (auth.currentUser.email === 'aligilljutt150@gmail.com' || (selectedTimetable?.userId === auth.currentUser.uid && selectedTimetable?.creatorEmail !== 'aligilljutt150@gmail.com')) && (
-                                    <button 
-                                      onClick={() => handleDeleteLecture(lect.id)}
-                                      className="absolute -top-1 -right-1 p-1 bg-red-100 text-red-600 rounded-full opacity-0 group-hover/cell:opacity-100 transition-opacity shadow-sm"
-                                    >
-                                      <X className="w-2.5 h-2.5" />
-                                    </button>
-                                  )}
                                   <div className="font-bold mb-1 line-clamp-2 text-slate-900">{lect.subject}</div>
                                   <div className="text-slate-500 font-medium">{lect.teacher}</div>
                                   <div className="mt-2 font-mono font-bold text-[9px] text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded inline-block w-fit">{lect.room}</div>
